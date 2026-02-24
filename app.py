@@ -78,7 +78,7 @@ def addProduct():
     product_image.save(file_path)
 
     # create a connection to db
-    connection = pymysql.connect(host="localhost", user="root", passwd='', database="kima_sokogarden")
+    connection = pymysql.connect(host="localhost", user="root", password='', database="kima_sokogarden")
 
     # create cursor
     cursor = connection.cursor()
@@ -112,6 +112,75 @@ def getProducts():
         # feth the prodfucts
         products = cursor.fetchall()
         return jsonify(products)
+
+
+# Mpesa Payment Route/Endpoint 
+import requests
+import datetime
+import base64
+from requests.auth import HTTPBasicAuth
+
+@app.route('/api/mpesa_payment', methods=['POST', 'GET'])
+def mpesa_payment():
+    if request.method == 'POST':
+        amount = request.form['amount']
+        phone = request.form['phone']
+        # GENERATING THE ACCESS TOKEN
+        # create an account on safaricom daraja
+        consumer_key = "GTWADFxIpUfDoNikNGqq1C3023evM6UH"
+        consumer_secret = "amFbAoUByPV2rM5A"
+
+        api_URL = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"  # AUTH URL
+        r = requests.get(api_URL, auth=HTTPBasicAuth(consumer_key, consumer_secret))
+        print(f"response from saf {r}")
+        data = r.json()
+        print(data)
+        access_token = "Bearer" + ' ' + data['access_token']
+
+        print(access_token)
+
+        #  GETTING THE PASSWORD
+        timestamp = datetime.datetime.today().strftime('%Y%m%d%H%M%S')
+        print(timestamp)
+        passkey = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'
+        business_short_code = "174379"
+        data = business_short_code + passkey + timestamp
+        print(f"data {data}")
+        encoded = base64.b64encode(data.encode())
+        print(f"encoded {encoded}")
+        password = encoded.decode('utf-8')
+        print(f"decoded {password}")
+        
+        # return "here"
+
+        # BODY OR PAYLOAD
+        payload = {
+            "BusinessShortCode": "174379",
+            "Password": "{}".format(password),
+            "Timestamp": "{}".format(timestamp),
+            "TransactionType": "CustomerPayBillOnline",
+            "Amount": "1",  # use 1 when testing
+            "PartyA": phone,  # change to your number
+            "PartyB": "174379",
+            "PhoneNumber": phone,
+            "CallBackURL": "https://modcom.co.ke/api/confirmation.php",
+            "AccountReference": "account",
+            "TransactionDesc": "account"
+        }
+
+        # POPULAING THE HTTP HEADER
+        headers = {
+            "Authorization": access_token,
+            "Content-Type": "application/json"
+        }
+
+        url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"  # C2B URL
+
+        response = requests.post(url, json=payload, headers=headers)
+        print(response.text)
+        return jsonify({"message": "Please Complete Payment in Your Phone and we will deliver in minutes"})
+    else:
+        return " this is get"
 
 if __name__ == "__main__":
     app.run(debug=True)
